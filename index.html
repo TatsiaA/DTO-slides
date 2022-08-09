@@ -1,0 +1,260 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+		<title>reveal.js</title>
+
+		<link rel="stylesheet" href="dist/reset.css">
+		<link rel="stylesheet" href="dist/reveal.css">
+		<link rel="stylesheet" href="dist/theme/white.css">
+
+		<!-- Theme used for syntax highlighted code -->
+		<link rel="stylesheet" href="plugin/highlight/monokai.css">
+	</head>
+	<body>
+		<div class="reveal">
+			<div class="slides">
+				<section data-background-gradient="radial-gradient(#ffe8d1, #ffffff)">
+					<h1>Data Transfer Object (DTO)</h1>
+				</section>
+				<section id="fragments">
+					<h2>Data Transfer Object (DTO)</h2>
+					<p> — шаблон проектирования, который используется для передачи данных между подсистемами приложения для уменьшения количества вызовов методов, это модель данных, которые мы передаём из одного слоя приложения в другой.</p>
+					<p class="fragment">Цель передачи данных - объект доступа к данным для извлечения данных из базы данных.</p>
+				</section>
+
+
+				<section data-auto-animate>
+					<h3>Зачем нужен DTO (объект передачи данных)</h3>
+
+					<section>
+						<h3 data-id="code-title"></h3>
+						<p></p>
+						<pre data-id="code-animation"><code class="hljs" data-trim>
+					public function store(Request $request)
+					{
+						$product = new Product();
+						$product->fill($request->all());
+
+						// Another 320 lines of code
+						//	where $request comes up again and again
+					}
+				</code></pre>
+					</section>
+					<section>
+						<p>Данный метод запроса имеет <span class="fragment highlight-red">много недостатков</span>: множественные запросы потребляют определенное количество сетевых ресурсов и снижают эффективность. Если за один раз возвращается весь класс сущности, это также может вызвать утечку структуры таблицы базы данных.</p>
+					</section>
+					<section>
+						<h3 data-id="code-title"></h3>
+						<p></p>
+						<pre data-id="code-animation"><code class="hljs" data-trim data-line-numbers="|15-18">class StoreProductRequest extends FormRequest
+{
+    public function getName(): string
+    {
+        return $this->name;
+    }
+
+    public function getDescription(): ?string
+    {
+        return $this->description;
+    }
+
+    public function rules(): array
+    {
+        return [
+            'name' => 'required',
+            'description' => 'nullable',
+            ...
+        ];
+    }
+}
+				</code></pre>
+					</section>
+					<section>
+						<p>Объекты передачи данных помогают «структурировать» данные, поступающие от различных типов запросов (запрос HTTP, запрос веб-перехватчика и т. д.), в единую форму, которую мы можем использовать в различных частях нашего приложения. С DTO мы уверены, что не получим неожиданных данных в логике нашего приложения.</p>
+					</section>
+				</section>
+				<section>
+					<section>
+						<h4 data-id="code-title">ProductData DTO</h4>
+						<pre data-id="code-animation"><code class="hljs" data-trim data-line-numbers>class ProductData
+{
+    public function __construct(
+        public readonly string $name,
+        public readonly ?string $description,
+    ) {}
+}
+				</code></pre>
+
+						<h4 data-id="code-title">Использование ProductData DTO в контроллере</h4>
+						<pre data-id="code-animation"><code class="hljs" data-trim >public function store(Request $request)
+{
+    $productData = new ProductData(
+        $request->getName(),
+        $request->getDescription()
+    );
+
+    // now you can pass the ProductData
+	  // to a Service or an Action...
+}
+				</code></pre>
+					</section>
+					<section>
+						<p>Если у вас много параметров или более сложные данные в запросе, вы можете написать factory method, который создает DTO из массива:</p>
+						<h3 data-id="code-title"></h3>
+						<pre data-id="code-animation"><code class="hljs" data-trim data-line-numbers>class ProductData
+{
+    public function __construct(
+        public readonly string $name,
+        public readonly ?string $description,
+    ) {}
+
+    public static function fromArray(array $data): self
+    {
+        return new static(
+            $data['name'],
+            Arr::get($data, 'description'),
+        );
+    }
+}
+
+				</code></pre>
+					</section>
+					<section>
+						<p>И использовать его так:</p>
+						<h3 data-id="code-title"></h3>
+						<pre data-id="code-animation"><code class="hljs" data-trim >public function store(Request $request)
+{
+    $productData = new ProductData(...$request->all());
+
+    // now you can pass the ProductData
+	  // to a Service or an Action...
+}
+				</code></pre>
+						<p>Или вот так:</p>
+						<pre data-id="code-animation"><code class="hljs" data-trim>$productData = new ProductData(...$request->validated());
+				</code></pre>
+						<p>PHP будет извлекать каждый элемент из массива и использовать в качестве аргумента в конструкторе. Это будет работать только в том случае, если ключи массива совпадают с именами ваших аргументов.</p>
+					</section>
+				</section>
+
+				<section>
+
+					<section>
+						<p>Но есть и другое решение: factory method, который принимает Request</p>
+						<h3 data-id="code-title"></h3>
+						<pre data-id="code-animation"><code class="hljs" data-trim >public static function fromRequest(
+							StoreProductRequest $request
+							): self
+{
+    return new static(
+        $request->getName(),
+        $request->getDescription(),
+    );
+}
+				</code></pre>
+						<ul>
+							<li class="fragment">Только контроллер и DTO взаимодействуют с запросами.</li>
+							<li class="fragment">Вы точно знаете, какие данные доступны на любом уровне приложения.</li>
+						</ul>
+
+					</section>
+
+				</section>
+				<section>
+					<section data-background-gradient="radial-gradient(#ffe8d1, #ffffff)">
+						<h2>Подводя итог</h2>
+					</section>
+
+					<section>
+						<h3 data-id="code-title">Request</h3>
+						<pre data-id="code-animation"><code class="hljs" data-trim data-line-numbers>class StoreProductRequest extends FormRequest
+{
+    public function getName(): string
+    {
+        return $this->name;
+    }
+
+    public function getDescription(): ?string
+    {
+        return $this->description;
+    }
+
+    public function rules()
+    {
+        return [
+            'name' => 'required',
+            'description' => 'nullable',
+        ];
+    }
+}
+				</code></pre>
+					</section>
+					<section>
+						<h3 data-id="code-title">Data Transfer Object </h3>
+						<p>(создан из Request)</p>
+						<pre data-id="code-animation"><code class="hljs" data-trim data-line-numbers>class ProductData
+{
+    public function __construct(
+        public readonly string $name,
+        public readonly ?string $description = null,
+    ) {}
+
+    public static function fromRequest(StoreProductRequest $request): self
+    {
+        return new static(
+            $request->getName(),
+            $request->getDescription(),
+        );
+    }
+}
+				</code></pre>
+					</section>
+					<section>
+						<h3 data-id="code-title">Controller</h3>
+						<p>(объединяет DTO и Request)</p>
+						<pre data-id="code-animation"><code class="hljs" data-trim data-line-numbers>class ProductController extends Controller
+{
+    public function store(StoreProductRequest $request)
+    {
+        $productData = ProductData::fromRequest($request);
+    }
+}
+				</code></pre>
+						<p class="fragment">Суть паттерна DTO - создать типизированную структуру для передачи данных.</p>
+					</section>
+				</section>
+				<section>
+					<h4>Преимущества использования DTO:</h4>
+					<ul>
+						<li class="fragment">Объекты DTO могут быть легко сконструированы без повторного анализа.</li>
+						<li class="fragment">Уменьшается количество запросов и значительно повышается эффективность.</li>
+						<li class="fragment">Организация объекта DTO по запросу, выбираем нужные поля на странице, и не используем поля, которые не нужны. Таким образом, можно избежать передачи полей всей таблицы, что в определенной степени повышает безопасность.</li>
+					</ul>
+
+				</section>
+				<section data-background-gradient="radial-gradient(#ffe8d1, #ffffff)">
+					<h3>Спасибо за внимание!</h3>
+				</section>
+			</div>
+		</div>
+
+		<script src="dist/reveal.js"></script>
+		<script src="plugin/notes/notes.js"></script>
+		<script src="plugin/markdown/markdown.js"></script>
+		<script src="plugin/highlight/highlight.js"></script>
+		<script>
+			// More info about initialization & config:
+			// - https://revealjs.com/initialization/
+			// - https://revealjs.com/config/
+			Reveal.initialize({
+				hash: true,
+
+				// Learn about plugins: https://revealjs.com/plugins/
+				plugins: [ RevealMarkdown, RevealHighlight, RevealNotes ]
+			});
+		</script>
+	</body>
+</html>
